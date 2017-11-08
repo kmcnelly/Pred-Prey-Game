@@ -51,7 +51,7 @@ unsigned long nextRoundTime = roundTime;
 //Score mechanics:=====================
 
 //if prey won last game
-boolean preyWin; 
+boolean preyWins; 
 //accumulated score of prey
 int preyScore = 0;
 //accumulated score of pred
@@ -65,7 +65,8 @@ const int pinTie = 2; //tied score
 const int pinPred2 = 3; //pred winning by 1-2
 const int pinPred3 = 4; //pred winning by 3 or more
 //score timing
-const int pauseTime = 4000; //4s pause at end of game of game
+const int EndRoundTime = 4000; //4s pause at end of game of game
+unsigned long nextEndRound = 0;
 
 
 
@@ -189,23 +190,46 @@ void displayGrid() {
   }
 }
 
-void displayScore(int row)
+void displayScore(int c)
 {
   //prey won last round
-  if(preWins)
-  {
-    int diff = predScore - preyScore;
+    int diff = preyScore - predScore;
     if(diff == 0)
     {
-      
+      if(c == pinTie)
+      {
+        digitalWrite(bottomRow, HIGH);
+      }
     }
-  }
-  //predator won last round
-  else
-  {
-    
-  }
- 
+    else if(diff <= 2)
+    {
+      if(c == pinTie || c == pinPrey2)
+      {
+        digitalWrite(bottomRow, HIGH);
+      }
+    }
+    else if(diff > 2)
+    {
+      if(c == pinTie || c == pinPrey2 || c == pinPrey3)
+      {
+        digitalWrite(bottomRow, HIGH);
+      }
+    }
+    //Pred winning
+    else if(diff >= -2)
+    {
+      if(c == pinTie || c == pinPred2)
+      {
+        digitalWrite(bottomRow, HIGH);
+      }
+    }
+    else if(diff < -2)
+    {
+      if(c == pinTie || c == pinPred2 || c == pinPred3)
+      {
+        digitalWrite(bottomRow, HIGH);
+      }
+    }
 }
 
 //display lastround winning character and ratio
@@ -215,22 +239,26 @@ void displayEndRound(){
     digitalWrite(pinCol[c], LOW);
 
     //sets rest of cols to high (clears grid)
-    for (int i = 0; i < maxCol; i++) {
+   for (int i = 0; i < maxCol; i++) {
       if (i != c)
       {
         digitalWrite(pinCol[i], HIGH);
       }
     }
 
-    //steps through rows
-    for (int r = 0; r < maxRow; r++)
+    if(c == 2)
     {
-      //Draw score
-      if (r == bottomRow)
+        digitalWrite(3, HIGH);
+    }
+    if(!preyWins)
+    {
+      if(c == 3 || c == 4)
       {
-        
+        digitalWrite(3, HIGH);
+        digitalWrite(4, HIGH);
       }
-    
+    }
+    displayScore(c);
    }
 }
 
@@ -269,9 +297,8 @@ State nextState(State state) {
     break;
     case roundOver:
     {
-      //display score
-      //delay(pauseTime);
-      s = preGame;
+      
+      //s = preGame;
     }
     break;
   }
@@ -288,7 +315,28 @@ void loop ()
 {
   if(s == preGame)
   {
-    s = nextState(s);
+    //set predator and prey in random locations
+
+        //random predator start position
+        int randPredCol = random(maxCol - 1);
+        int randPredRow = random(maxRow - 1);
+
+        predCol = randPredCol;
+        predRow = randPredRow;
+
+        //random prey start position (does not allow them to be right next to each other)
+        do
+        {
+          preyCol = random(maxCol);
+        } while (preyCol == predCol || preyCol == predCol - 1 || preyCol == predCol + 1 || preyCol == predCol + 2);
+
+        do 
+        {
+          preyRow = random(maxRow);
+        } while (preyRow == predRow || preyRow == predRow - 1 || preyRow == predRow + 1 || preyRow == predRow + 2);
+
+        displayGrid();
+        s = inGame;
   }
   //while game is running
   if (s == inGame)
@@ -311,19 +359,27 @@ void loop ()
     {
       preyWins = false;
       predScore++;
-      s = nextState(s);
+      s = roundOver;
+      nextEndRound = millis() + EndRoundTime;
     }
     //prey wins
     else if ( millis() > roundTime)
     {
       preyWins = true;
       preyScore++;
-      s = nextState(s);
+      s = roundOver;
+      nextEndRound =  millis() + EndRoundTime;
     }
   }
   else if (s == roundOver)
   {
-      s = nextState(s);
+     displayEndRound();
+     if(millis() > nextEndRound)
+     {
+       s = preGame;
+
+      nextEndRound = millis() + EndRoundTime;
+     }
   }
 }
 
